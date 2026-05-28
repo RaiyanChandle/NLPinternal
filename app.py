@@ -5,6 +5,7 @@ import plotly.express as px
 import os
 import nltk
 import tensorflow as tf
+import zipfile
 
 # Set page config with premium aesthetics
 st.set_page_config(
@@ -183,20 +184,38 @@ def load_emotion_model():
         st.error(f"Error loading model: {str(e)}")
         return None
 
-@st.cache_resource(show_spinner="Loading GloVe Word Embeddings (171MB, might take a few seconds)...")
+@st.cache_resource(show_spinner="Loading GloVe Word Embeddings...")
 def load_glove_vectors():
-    embeddings_path = "glove.6B.50d.txt"
-    if not os.path.exists(embeddings_path):
-        st.error(f"Embedding file '{embeddings_path}' not found. Please make sure it is in the workspace.")
-        return None
+    txt_path = "glove.6B.50d.txt"
+    zip_path = "glove.6B.50d.zip"
     
     embeddings_index = {}
-    with open(embeddings_path, encoding='utf8') as f:
-        for line in f:
-            values = line.rstrip().rsplit(' ')
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
+    
+    if os.path.exists(txt_path):
+        with open(txt_path, encoding='utf8') as f:
+            for line in f:
+                values = line.rstrip().rsplit(' ')
+                word = values[0]
+                coefs = np.asarray(values[1:], dtype='float32')
+                embeddings_index[word] = coefs
+    elif os.path.exists(zip_path):
+        with zipfile.ZipFile(zip_path) as z:
+            txt_filename = "glove.6B.50d.txt"
+            if txt_filename in z.namelist():
+                with z.open(txt_filename) as f:
+                    for line in f:
+                        line_decoded = line.decode('utf-8').rstrip()
+                        values = line_decoded.rsplit(' ')
+                        word = values[0]
+                        coefs = np.asarray(values[1:], dtype='float32')
+                        embeddings_index[word] = coefs
+            else:
+                st.error(f"'{txt_filename}' not found inside '{zip_path}'.")
+                return None
+    else:
+        st.error("Neither 'glove.6B.50d.txt' nor 'glove.6B.50d.zip' was found in the workspace.")
+        return None
+        
     return embeddings_index
 
 @st.cache_data(show_spinner="Loading training samples from ISEAR dataset...")
